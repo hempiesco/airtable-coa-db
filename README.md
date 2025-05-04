@@ -17,6 +17,7 @@ This script syncs inventory from Square to Airtable for COA management. It maint
 - cURL extension
 - Square API access token
 - Airtable API key and base ID
+- Docker (for deployment)
 
 ## Local Development Setup
 
@@ -44,15 +45,26 @@ This script syncs inventory from Square to Airtable for COA management. It maint
 2. Connect your GitHub repository
 3. Configure the following settings:
    - Name: `hempies-coa-sync`
-   - Environment: `PHP`
-   - Build Command: `composer install`
-   - Start Command: `php -S 0.0.0.0:$PORT`
+   - Environment: `Docker`
+   - Dockerfile Path: `./Dockerfile`
 4. Add the following environment variables in Render's dashboard:
    - `SQUARE_ACCESS_TOKEN`
    - `AIRTABLE_API_KEY`
    - `AIRTABLE_BASE_ID`
    - `AIRTABLE_TABLE_NAME` (defaults to "Products")
    - `PHP_VERSION` (set to "8.1")
+
+## Local Docker Development
+
+To run the application locally using Docker:
+
+```bash
+# Build the Docker image
+docker build -t hempies-coa-sync .
+
+# Run the container
+docker run -p 8080:8080 --env-file .env hempies-coa-sync
+```
 
 ## Airtable Setup
 
