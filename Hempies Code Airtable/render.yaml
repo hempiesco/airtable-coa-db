@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: hempies-coa-sync
+    env: php
+    buildCommand: composer install
+    startCommand: php -S 0.0.0.0:$PORT
+    envVars:
+      - key: SQUARE_ACCESS_TOKEN
+        sync: false
+      - key: AIRTABLE_API_KEY
+        sync: false
+      - key: AIRTABLE_BASE_ID
+        sync: false
+      - key: AIRTABLE_TABLE_NAME
+        value: Products
+      - key: PHP_VERSION
+        value: 8.1 
