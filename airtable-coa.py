@@ -292,7 +292,7 @@ def sync_square_to_airtable():
         record_data = {
             'ProductID': product_id,
             'Product Name': name,
-            'Category': {'name': category_name},
+            'Category': category_name,
             'Current Quantity': item['quantity'],
             'Item Data Ecom Available': True,
             'Present At All Locations': True,
