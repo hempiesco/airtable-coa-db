@@ -19,14 +19,20 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Set working directory
 WORKDIR /var/www/html
 
-# Copy application files
-COPY . .
+# Copy composer files first
+COPY composer.json composer.lock* ./
 
 # Install dependencies
 RUN composer install --no-interaction --no-dev --optimize-autoloader
+
+# Copy the rest of the application
+COPY . .
+
+# Set proper permissions
+RUN chown -R www-data:www-data /var/www/html
 
 # Expose port 8080
 EXPOSE 8080
 
 # Start PHP server
-CMD ["php", "-S", "0.0.0.0:8080"] 
+CMD ["php", "-S", "0.0.0.0:8080", "-t", "/var/www/html"] 
