@@ -28,8 +28,12 @@ RUN composer install --no-interaction --no-dev --optimize-autoloader
 # Copy the rest of the application
 COPY . .
 
+# Create src directory if it doesn't exist
+RUN mkdir -p src
+
 # Set proper permissions
-RUN chown -R www-data:www-data /var/www/html
+RUN chown -R www-data:www-data /var/www/html && \
+    chmod -R 755 /var/www/html
 
 # Expose port 8080
 EXPOSE 8080
