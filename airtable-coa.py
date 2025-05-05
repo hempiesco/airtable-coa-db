@@ -8,7 +8,7 @@ import logging
 
 # Configuration from environment variables
 SQUARE_ACCESS_TOKEN = os.environ.get('SQUARE_ACCESS_TOKEN')
-SQUARE_LOCATION_ID = os.environ.get('SQUARE_LOCATION_ID', 'LXNA062VNG2T2')
+SQUARE_LOCATION_IDS = os.environ.get('SQUARE_LOCATION_IDS', 'LXNA062VNG2T2').split(',')  # Comma-separated list of location IDs
 AIRTABLE_API_KEY = os.environ.get('AIRTABLE_API_KEY')
 AIRTABLE_BASE_ID = os.environ.get('AIRTABLE_BASE_ID')
 AIRTABLE_TABLE_NAME = os.environ.get('AIRTABLE_TABLE_NAME', 'Products')
@@ -116,7 +116,7 @@ def get_inventory_counts(catalog_item_id):
     
     body = {
         'catalog_object_ids': [catalog_item_id],
-        'location_ids': [SQUARE_LOCATION_ID]
+        'location_ids': SQUARE_LOCATION_IDS
     }
     
     try:
@@ -134,12 +134,24 @@ def has_stock(inventory_counts):
     if not inventory_counts:
         return False
     
+    total_quantity = 0
     for count in inventory_counts:
         quantity = int(count.get('quantity', 0))
-        if quantity > 0:
-            return True
+        total_quantity += quantity
     
-    return False
+    return total_quantity > 0
+
+def get_total_quantity(inventory_counts):
+    """Calculate total quantity across all locations"""
+    if not inventory_counts:
+        return 0
+    
+    total = 0
+    for count in inventory_counts:
+        quantity = int(count.get('quantity', 0))
+        total += quantity
+    
+    return total
 
 def fetch_square_items():
     """Fetch all items from Square API"""
@@ -289,20 +301,26 @@ def sync_square_to_airtable():
         name = item['name']
         category_name = item['category_name']
         
-        # Record should be kept
-        products_to_keep.add(product_id)
+        # Get current inventory counts
+        inventory_counts = get_inventory_counts(product_id)
+        total_quantity = get_total_quantity(inventory_counts)
+        
+        # Record should be kept if it has stock
+        if total_quantity > 0:
+            products_to_keep.add(product_id)
         
         # Prepare Airtable record data
         record_data = {
             'ProductID': product_id,
             'Product Name': name,
             'Category': category_name,
-            'Current Quantity': item['quantity'],
-            'Item Data Ecom Available': True,
+            'Current Quantity': total_quantity,
+            'Item Data Ecom Available': total_quantity > 0,
             'Present At All Locations': True,
             'Last Updated': datetime.now().strftime('%m/%d/%Y %I:%M %p'),
             'SKU': item['sku'],
-            'Vendor Name': item['vendor']
+            'Vendor Name': item['vendor'],
+            'Status': 'Available' if total_quantity > 0 else 'Unavailable'
         }
         
         # Check if product already exists
@@ -317,25 +335,33 @@ def sync_square_to_airtable():
             except Exception as e:
                 logger.error(f"Error updating product {name}: {str(e)}")
         else:
-            # Create new record
-            try:
-                table = Api(AIRTABLE_API_KEY).table(AIRTABLE_BASE_ID, AIRTABLE_TABLE_NAME)
-                table.create(record_data)
-                logger.info(f"Created product: {name}")
-                stats['created'] += 1
-            except Exception as e:
-                logger.error(f"Error creating product {name}: {str(e)}")
+            # Only create new record if product has stock
+            if total_quantity > 0:
+                try:
+                    table = Api(AIRTABLE_API_KEY).table(AIRTABLE_BASE_ID, AIRTABLE_TABLE_NAME)
+                    table.create(record_data)
+                    logger.info(f"Created product: {name}")
+                    stats['created'] += 1
+                except Exception as e:
+                    logger.error(f"Error creating product {name}: {str(e)}")
     
-    # Remove products that no longer have stock or were excluded
+    # Update or remove products that no longer have stock
     for product_id, record in existing_products.items():
         if product_id not in products_to_keep:
             try:
                 table = Api(AIRTABLE_API_KEY).table(AIRTABLE_BASE_ID, AIRTABLE_TABLE_NAME)
-                table.delete(record['id'])
-                logger.info(f"Removed product: {record['fields'].get('Product Name', 'Unknown')}")
-                stats['removed'] += 1
+                # Update status to Unavailable instead of deleting
+                record_data = {
+                    'Status': 'Unavailable',
+                    'Item Data Ecom Available': False,
+                    'Current Quantity': 0,
+                    'Last Updated': datetime.now().strftime('%m/%d/%Y %I:%M %p')
+                }
+                table.update(record['id'], record_data)
+                logger.info(f"Updated product status to Unavailable: {record['fields'].get('Product Name', 'Unknown')}")
+                stats['updated'] += 1
             except Exception as e:
-                logger.error(f"Error removing product {record['fields'].get('Product Name', 'Unknown')}: {str(e)}")
+                logger.error(f"Error updating product status {record['fields'].get('Product Name', 'Unknown')}: {str(e)}")
     
     # Log final stats
     logger.info(f"Sync completed. Stats: {json.dumps(stats)}")
