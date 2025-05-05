@@ -296,7 +296,7 @@ def sync_square_to_airtable():
             'Current Quantity': item['quantity'],
             'Item Data Ecom Available': True,
             'Present At All Locations': True,
-            'Last Updated': datetime.now().isoformat()
+            'Last Updated': datetime.now().strftime('%m/%d/%Y %I:%M %p')
         }
         
         # Check if product already exists
