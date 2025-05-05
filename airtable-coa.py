@@ -212,7 +212,9 @@ def fetch_square_items():
                             'variation_name': variation_name,
                             'category_id': category_id,
                             'category_name': category_name,
-                            'quantity': 1  # We know it has stock but not the exact quantity
+                            'quantity': 1,  # We know it has stock but not the exact quantity
+                            'sku': variation_data.get('sku', ''),
+                            'vendor': item_data.get('vendor_id', '')
                         })
                 else:
                     # Simple product without variations
@@ -228,7 +230,9 @@ def fetch_square_items():
                         'variation_name': '',
                         'category_id': category_id,
                         'category_name': category_name,
-                        'quantity': 1  # We know it has stock but not the exact quantity
+                        'quantity': 1,  # We know it has stock but not the exact quantity
+                        'sku': item_data.get('sku', ''),
+                        'vendor': item_data.get('vendor_id', '')
                     })
             
             cursor = data.get('cursor')
@@ -296,7 +300,9 @@ def sync_square_to_airtable():
             'Current Quantity': item['quantity'],
             'Item Data Ecom Available': True,
             'Present At All Locations': True,
-            'Last Updated': datetime.now().strftime('%m/%d/%Y %I:%M %p')
+            'Last Updated': datetime.now().strftime('%m/%d/%Y %I:%M %p'),
+            'SKU': item['sku'],
+            'Vendor Name': item['vendor']
         }
         
         # Check if product already exists
