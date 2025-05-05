@@ -1,0 +1,23 @@
+services:
+  - type: worker
+    name: square-airtable-sync
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python airtable-coa.py
+    envVars:
+      - key: SQUARE_ACCESS_TOKEN
+        sync: false
+      - key: SQUARE_LOCATION_ID
+        sync: false
+      - key: AIRTABLE_API_KEY
+        sync: false
+      - key: AIRTABLE_BASE_ID
+        sync: false
+      - key: AIRTABLE_TABLE_NAME
+        sync: false
+      - key: AIRTABLE_VENDOR_TABLE
+        sync: false
+      - key: NOTIFICATION_EMAIL
+        sync: false
+      - key: EXCLUDED_CATEGORIES
+        sync: false 
