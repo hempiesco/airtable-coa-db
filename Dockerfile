@@ -28,8 +28,14 @@ RUN composer install --no-interaction --no-dev --optimize-autoloader
 # Copy the rest of the application
 COPY . .
 
-# Create src directory if it doesn't exist
-RUN mkdir -p src
+# Create src directory if it doesn't exist and ensure it's empty
+RUN rm -rf src/* && mkdir -p src
+
+# Copy the class file to the correct location
+COPY src/Hempies_COA_Airtable.php src/
+
+# Regenerate autoloader
+RUN composer dump-autoload -o
 
 # Set proper permissions
 RUN chown -R www-data:www-data /var/www/html && \
