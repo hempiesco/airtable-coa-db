@@ -1,4 +1,4 @@
-FROM php:8.1-cli
+FROM php:8.1-apache
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -10,8 +10,11 @@ RUN apt-get update && apt-get install -y \
     zip \
     unzip
 
+# Clear cache
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+
 # Install PHP extensions
-RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath
+RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
 
 # Get latest Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -19,30 +22,28 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Set working directory
 WORKDIR /var/www/html
 
-# Copy composer files first
+# Copy composer files
 COPY composer.json composer.lock* ./
 
 # Install dependencies
-RUN composer install --no-interaction --no-dev --optimize-autoloader
+RUN composer install --no-scripts --no-autoloader
 
-# Copy the rest of the application
+# Copy source files
 COPY . .
 
-# Create src directory if it doesn't exist and ensure it's empty
-RUN rm -rf src/* && mkdir -p src
-
-# Copy the class file to the correct location
-COPY src/Hempies_COA_Airtable.php src/
-
-# Regenerate autoloader
+# Generate autoloader
 RUN composer dump-autoload -o
 
-# Set proper permissions
-RUN chown -R www-data:www-data /var/www/html && \
-    chmod -R 755 /var/www/html
+# Set permissions
+RUN chown -R www-data:www-data /var/www/html \
+    && chmod -R 755 /var/www/html
+
+# Configure Apache
+RUN a2enmod rewrite
+COPY docker/apache/000-default.conf /etc/apache2/sites-available/000-default.conf
 
 # Expose port 8080
 EXPOSE 8080
 
-# Start PHP server
-CMD ["php", "-S", "0.0.0.0:8080", "-t", "/var/www/html"] 
+# Start Apache
+CMD ["apache2-foreground"] 
