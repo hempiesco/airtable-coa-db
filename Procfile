@@ -1,1 +1,1 @@
-worker: python airtable-coa.py 
+worker: python wsgi.py 
