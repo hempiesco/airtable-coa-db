@@ -366,6 +366,137 @@ def sync_square_to_airtable():
     # Log final stats
     logger.info(f"Sync completed. Stats: {json.dumps(stats)}")
 
+def fetch_square_vendors():
+    """Fetch all vendors from Square API"""
+    logger.info("Fetching vendors from Square API...")
+    
+    vendors = []
+    cursor = None
+    
+    while True:
+        endpoint = f"{SQUARE_BASE_URL}/vendors"
+        if cursor:
+            endpoint += f"?cursor={cursor}"
+            
+        headers = {
+            'Square-Version': '2023-09-25',
+            'Authorization': f'Bearer {SQUARE_ACCESS_TOKEN}',
+            'Content-Type': 'application/json'
+        }
+        
+        try:
+            response = requests.get(endpoint, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+            
+            if not data.get('vendors'):
+                break
+                
+            for vendor in data.get('vendors', []):
+                vendors.append({
+                    'id': vendor.get('id'),
+                    'name': vendor.get('name', ''),
+                    'email': vendor.get('email', ''),
+                    'phone': vendor.get('phone_number', ''),
+                    'account_number': vendor.get('account_number', ''),
+                    'note': vendor.get('note', '')
+                })
+            
+            cursor = data.get('cursor')
+            if not cursor:
+                break
+                
+        except Exception as e:
+            logger.error(f"Error fetching vendors: {str(e)}")
+            break
+    
+    logger.info(f"Fetched {len(vendors)} vendors from Square")
+    return vendors
+
+def get_existing_airtable_vendors():
+    """Get all existing vendors from Airtable"""
+    logger.info("Fetching existing vendors from Airtable...")
+    
+    existing_vendors = {}
+    
+    try:
+        table = Api(AIRTABLE_API_KEY).table(AIRTABLE_BASE_ID, AIRTABLE_VENDOR_TABLE)
+        records = table.all()
+        
+        for record in records:
+            vendor_id = record['fields'].get('VendorID')
+            if vendor_id:
+                existing_vendors[vendor_id] = record
+                
+        logger.info(f"Found {len(existing_vendors)} existing vendors in Airtable")
+        return existing_vendors
+    except Exception as e:
+        logger.error(f"Error fetching Airtable vendors: {str(e)}")
+        return {}
+
+def sync_vendors_to_airtable():
+    """Sync Square vendors to Airtable"""
+    logger.info("Starting vendor sync...")
+    
+    # Get vendors from Square
+    vendors = fetch_square_vendors()
+    
+    # Get existing vendors from Airtable
+    existing_vendors = get_existing_airtable_vendors()
+    
+    # Track vendor IDs to keep
+    vendors_to_keep = set()
+    
+    # Process each vendor
+    for vendor in vendors:
+        vendor_id = vendor['id']
+        name = vendor['name']
+        
+        # Record should be kept
+        vendors_to_keep.add(vendor_id)
+        
+        # Prepare Airtable record data
+        record_data = {
+            'VendorID': vendor_id,
+            'Vendor Name': name,
+            'Email': vendor['email'],
+            'Phone': vendor['phone'],
+            'Account Number': vendor['account_number'],
+            'Notes': vendor['note'],
+            'Last Updated': datetime.now().strftime('%m/%d/%Y %I:%M %p')
+        }
+        
+        # Check if vendor already exists
+        if vendor_id in existing_vendors:
+            # Update existing record
+            record = existing_vendors[vendor_id]
+            try:
+                table = Api(AIRTABLE_API_KEY).table(AIRTABLE_BASE_ID, AIRTABLE_VENDOR_TABLE)
+                table.update(record['id'], record_data)
+                logger.info(f"Updated vendor: {name}")
+            except Exception as e:
+                logger.error(f"Error updating vendor {name}: {str(e)}")
+        else:
+            # Create new record
+            try:
+                table = Api(AIRTABLE_API_KEY).table(AIRTABLE_BASE_ID, AIRTABLE_VENDOR_TABLE)
+                table.create(record_data)
+                logger.info(f"Created vendor: {name}")
+            except Exception as e:
+                logger.error(f"Error creating vendor {name}: {str(e)}")
+    
+    # Remove vendors that no longer exist in Square
+    for vendor_id, record in existing_vendors.items():
+        if vendor_id not in vendors_to_keep:
+            try:
+                table = Api(AIRTABLE_API_KEY).table(AIRTABLE_BASE_ID, AIRTABLE_VENDOR_TABLE)
+                table.delete(record['id'])
+                logger.info(f"Removed vendor: {record['fields'].get('Vendor Name', 'Unknown')}")
+            except Exception as e:
+                logger.error(f"Error removing vendor {record['fields'].get('Vendor Name', 'Unknown')}: {str(e)}")
+    
+    logger.info("Vendor sync completed")
+
 if __name__ == "__main__":
     if not SQUARE_ACCESS_TOKEN:
         logger.error("Square API token is not configured")
@@ -374,6 +505,9 @@ if __name__ == "__main__":
     if not AIRTABLE_API_KEY or not AIRTABLE_BASE_ID:
         logger.error("Airtable credentials are not configured")
         exit(1)
-        
-    # Run the sync
+    
+    # Run the vendor sync first
+    sync_vendors_to_airtable()
+    
+    # Then run the product sync
     sync_square_to_airtable()
