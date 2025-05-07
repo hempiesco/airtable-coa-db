@@ -4,6 +4,8 @@ import subprocess
 import sys
 import time
 from datetime import datetime
+import signal
+import os
 
 app = Flask(__name__)
 
@@ -16,8 +18,11 @@ sync_status = {
     'error': None
 }
 
+# Global variable to store the subprocess
+current_process = None
+
 def run_sync():
-    global sync_status
+    global sync_status, current_process
     try:
         sync_status['is_running'] = True
         sync_status['is_paused'] = False
@@ -25,20 +30,53 @@ def run_sync():
         
         # Run vendor sync
         sync_status['current_operation'] = 'Syncing vendors...'
-        subprocess.run([sys.executable, 'airtable-coa.py'], check=True)
         
-        # Update status
-        sync_status['last_sync'] = datetime.now().strftime('%m/%d/%Y %I:%M %p')
-        sync_status['current_operation'] = 'Sync completed successfully'
-    except subprocess.CalledProcessError as e:
-        sync_status['error'] = f"Sync failed: {str(e)}"
-        sync_status['current_operation'] = 'Sync failed'
+        # Create the subprocess
+        current_process = subprocess.Popen(
+            [sys.executable, 'airtable-coa.py'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        
+        # Monitor the process
+        while current_process.poll() is None:
+            if sync_status['is_paused']:
+                # Send SIGSTOP to pause the process
+                os.kill(current_process.pid, signal.SIGSTOP)
+                time.sleep(0.1)  # Small delay to prevent CPU spinning
+            else:
+                # If it was paused, resume it
+                try:
+                    os.kill(current_process.pid, signal.SIGCONT)
+                except ProcessLookupError:
+                    pass
+            
+            # Check if we should stop
+            if not sync_status['is_running']:
+                current_process.terminate()
+                current_process.wait()
+                break
+        
+        # Get the output
+        stdout, stderr = current_process.communicate()
+        
+        if current_process.returncode == 0:
+            sync_status['last_sync'] = datetime.now().strftime('%m/%d/%Y %I:%M %p')
+            sync_status['current_operation'] = 'Sync completed successfully'
+        else:
+            sync_status['error'] = f"Sync failed with return code {current_process.returncode}"
+            if stderr:
+                sync_status['error'] += f": {stderr}"
+            sync_status['current_operation'] = 'Sync failed'
+            
     except Exception as e:
         sync_status['error'] = f"Unexpected error: {str(e)}"
         sync_status['current_operation'] = 'Sync failed'
     finally:
         sync_status['is_running'] = False
         sync_status['is_paused'] = False
+        current_process = None
 
 @app.route('/')
 def home():
@@ -57,6 +95,12 @@ def stop_sync():
     if sync_status['is_running']:
         sync_status['is_running'] = False
         sync_status['is_paused'] = False
+        if current_process:
+            try:
+                current_process.terminate()
+                current_process.wait(timeout=5)  # Wait up to 5 seconds for process to terminate
+            except subprocess.TimeoutExpired:
+                current_process.kill()  # Force kill if it doesn't terminate
         sync_status['current_operation'] = 'Sync stopped by user'
         return jsonify({'status': 'stopped'})
     return jsonify({'status': 'not_running'})
