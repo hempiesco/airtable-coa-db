@@ -1,4 +1,4 @@
-from flask import Flask, render_template_string
+from flask import Flask, render_template_string, redirect, url_for
 import threading
 import subprocess
 import sys
@@ -138,7 +138,7 @@ def start_sync():
     if current_sync_process is None or current_sync_process.poll() is not None:
         sync_thread = threading.Thread(target=run_worker)
         sync_thread.start()
-    return trigger_sync()
+    return redirect(url_for('trigger_sync'))
 
 @app.route('/cancel', methods=['POST'])
 def cancel_sync():
@@ -150,7 +150,7 @@ def cancel_sync():
             current_sync_process = None
         except Exception as e:
             print(f"Error canceling sync: {e}")
-    return trigger_sync()
+    return redirect(url_for('trigger_sync'))
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000) 
