@@ -487,7 +487,7 @@ def sync_vendors_to_airtable():
             'Name': name,
             'Phone': vendor['phone'],
             'Email': vendor['email'],
-            'Contact Name': vendor['contact_name'],
+            'Contact': vendor['contact_name'],
             'Address': vendor['address'],
             'Last Synced': datetime.now().strftime('%m/%d/%Y %I:%M %p')
         }
