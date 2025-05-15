@@ -4,21 +4,34 @@ import subprocess
 import sys
 import signal
 import os
+import psutil
 
 app = Flask(__name__)
 
 # Global variable to track the sync process
 current_sync_process = None
+sync_thread = None
 
 def run_worker():
     global current_sync_process
     try:
-        current_sync_process = subprocess.Popen([sys.executable, 'airtable-coa.py'])
+        # Create a new process group
+        current_sync_process = subprocess.Popen(
+            [sys.executable, 'airtable-coa.py'],
+            preexec_fn=os.setsid  # This creates a new process group
+        )
         current_sync_process.wait()
     except subprocess.CalledProcessError as e:
         print(f"Worker process failed with error: {e}")
     finally:
         current_sync_process = None
+
+def is_process_running(pid):
+    try:
+        process = psutil.Process(pid)
+        return process.is_running()
+    except (psutil.NoSuchProcess, psutil.AccessDenied):
+        return False
 
 @app.route('/')
 def home():
@@ -27,6 +40,14 @@ def home():
 @app.route('/sync')
 def trigger_sync():
     global current_sync_process
+    
+    # Check if process is actually running
+    is_syncing = False
+    if current_sync_process is not None:
+        try:
+            is_syncing = current_sync_process.poll() is None
+        except:
+            is_syncing = False
     
     # HTML template with sync status and cancel button
     html_template = """
@@ -70,13 +91,14 @@ def trigger_sync():
     </html>
     """
     
-    return render_template_string(html_template, is_syncing=current_sync_process is not None)
+    return render_template_string(html_template, is_syncing=is_syncing)
 
 @app.route('/sync', methods=['POST'])
 def start_sync():
-    if current_sync_process is None:
-        thread = threading.Thread(target=run_worker)
-        thread.start()
+    global current_sync_process, sync_thread
+    if current_sync_process is None or current_sync_process.poll() is not None:
+        sync_thread = threading.Thread(target=run_worker)
+        sync_thread.start()
     return trigger_sync()
 
 @app.route('/cancel', methods=['POST'])
@@ -84,8 +106,8 @@ def cancel_sync():
     global current_sync_process
     if current_sync_process is not None:
         try:
-            # Send SIGTERM to the process
-            os.kill(current_sync_process.pid, signal.SIGTERM)
+            # Kill the entire process group
+            os.killpg(os.getpgid(current_sync_process.pid), signal.SIGTERM)
             current_sync_process = None
         except Exception as e:
             print(f"Error canceling sync: {e}")
