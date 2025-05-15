@@ -1,4 +1,4 @@
-from flask import Flask, render_template_string, redirect, url_for
+from flask import Flask, render_template_string, redirect, url_for, jsonify
 import threading
 import subprocess
 import sys
@@ -98,6 +98,17 @@ def trigger_sync():
                 }
             }
             
+            function handleCancel(event) {
+                event.preventDefault();
+                stopAutoRefresh();
+                
+                fetch('/cancel', {
+                    method: 'POST',
+                }).then(() => {
+                    window.location.href = '/sync';
+                });
+            }
+            
             window.onload = function() {
                 const statusText = document.getElementById('sync-status').textContent;
                 if (statusText.includes('running')) {
@@ -117,7 +128,7 @@ def trigger_sync():
                 {% endif %}
             </p>
             {% if is_syncing %}
-                <form action="/cancel" method="post" onsubmit="stopAutoRefresh()">
+                <form onsubmit="handleCancel(event)">
                     <button type="submit" class="button cancel-button">Cancel Sync</button>
                 </form>
             {% else %}
@@ -150,7 +161,7 @@ def cancel_sync():
             current_sync_process = None
         except Exception as e:
             print(f"Error canceling sync: {e}")
-    return redirect(url_for('trigger_sync'))
+    return jsonify({"status": "success"})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000) 
