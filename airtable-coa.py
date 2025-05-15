@@ -139,9 +139,13 @@ def has_stock(inventory_counts):
         return False
     
     for count in inventory_counts:
-        quantity = int(count.get('quantity', 0))
-        if quantity > 0:
-            return True
+        try:
+            quantity = float(count.get('quantity', 0))
+            if quantity > 0:
+                return True
+        except (ValueError, TypeError):
+            logger.warning(f"Invalid quantity value: {count.get('quantity')}")
+            continue
     
     return False
 
