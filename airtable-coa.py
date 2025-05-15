@@ -365,33 +365,40 @@ def fetch_square_vendors():
     cursor = None
     
     while True:
-        endpoint = f"{SQUARE_BASE_URL}/catalog/list?types=VENDOR"
-        if cursor:
-            endpoint += f"&cursor={cursor}"
-            
+        endpoint = f"{SQUARE_BASE_URL}/vendors/search"
+        
         headers = {
             'Square-Version': '2023-09-25',
             'Authorization': f'Bearer {SQUARE_ACCESS_TOKEN}',
             'Content-Type': 'application/json'
         }
         
+        # Prepare request body with filter for active vendors
+        body = {
+            "filter": {
+                "status": ["ACTIVE"]
+            }
+        }
+        
+        # Add cursor if we have one
+        if cursor:
+            body["cursor"] = cursor
+        
         try:
-            response = requests.get(endpoint, headers=headers)
+            response = requests.post(endpoint, headers=headers, json=body)
             response.raise_for_status()
             data = response.json()
             
-            if not data.get('objects'):
+            if not data.get('vendors'):
                 break
                 
-            for obj in data.get('objects', []):
-                if obj['type'] == 'VENDOR':
-                    vendor_data = obj.get('vendor_data', {})
-                    vendors.append({
-                        'id': obj.get('id'),
-                        'name': vendor_data.get('name', ''),
-                        'phone': vendor_data.get('phone_number', ''),
-                        'email': vendor_data.get('email', '')
-                    })
+            for vendor in data.get('vendors', []):
+                vendors.append({
+                    'id': vendor.get('id'),
+                    'name': vendor.get('name', ''),
+                    'phone': vendor.get('phone_number', ''),
+                    'email': vendor.get('email', '')
+                })
             
             cursor = data.get('cursor')
             if not cursor:
