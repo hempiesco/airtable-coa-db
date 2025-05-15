@@ -85,6 +85,10 @@ def fetch_square_categories():
 
 def is_excluded_category(category_id, category_name, category_map):
     """Check if a category is in the excluded list"""
+    # If category is empty or None, it's not excluded
+    if not category_name:
+        return False
+        
     # Check by ID
     if category_id in EXCLUDED_CATEGORIES:
         logger.info(f"Category excluded by ID: {category_id}")
@@ -96,7 +100,7 @@ def is_excluded_category(category_id, category_name, category_map):
         return True
         
     # Check case insensitive
-    category_name_lower = category_name.lower() if category_name else ""
+    category_name_lower = category_name.lower()
     for excluded in EXCLUDED_CATEGORIES:
         if excluded.lower() == category_name_lower:
             logger.info(f"Category excluded by case-insensitive name: {category_name}")
@@ -289,6 +293,12 @@ def sync_square_to_airtable():
         name = item['name']
         category_name = item['category_name']
         
+        # Skip if category is in excluded list (but allow empty categories)
+        if category_name and is_excluded_category(None, category_name, None):
+            logger.info(f"Skipping product {name} - category {category_name} is excluded")
+            stats['skipped'] += 1
+            continue
+        
         # Record should be kept
         products_to_keep.add(product_id)
         
@@ -296,7 +306,6 @@ def sync_square_to_airtable():
         record_data = {
             'ProductID': product_id,
             'Product Name': name,
-            'Category': category_name,
             'Current Quantity': item['quantity'],
             'Item Data Ecom Available': True,
             'Present At All Locations': True,
@@ -304,6 +313,10 @@ def sync_square_to_airtable():
             'SKU': item['sku'],
             'Vendor Name': item['vendor']
         }
+        
+        # Add category if it exists and is not empty
+        if category_name and category_name.strip():
+            record_data['Category'] = category_name
         
         # Check if product already exists
         if product_id in existing_products:
