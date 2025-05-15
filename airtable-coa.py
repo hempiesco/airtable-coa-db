@@ -393,11 +393,39 @@ def fetch_square_vendors():
                 break
                 
             for vendor in data.get('vendors', []):
+                # Get primary contact info (first non-removed contact)
+                contact_info = None
+                for contact in vendor.get('contacts', []):
+                    if not contact.get('removed', False):
+                        contact_info = contact
+                        break
+                
+                # Extract address components
+                address = vendor.get('address', {})
+                address_line_1 = address.get('address_line_1', '')
+                address_line_2 = address.get('address_line_2', '')
+                city = address.get('locality', '')
+                state = address.get('administrative_district_level_1', '')
+                postal_code = address.get('postal_code', '')
+                
+                # Combine address components
+                full_address = f"{address_line_1}"
+                if address_line_2:
+                    full_address += f", {address_line_2}"
+                if city:
+                    full_address += f", {city}"
+                if state:
+                    full_address += f", {state}"
+                if postal_code:
+                    full_address += f" {postal_code}"
+                
                 vendors.append({
                     'id': vendor.get('id'),
                     'name': vendor.get('name', ''),
-                    'phone': vendor.get('phone_number', ''),
-                    'email': vendor.get('email', '')
+                    'phone': contact_info.get('phone_number', '') if contact_info else '',
+                    'email': contact_info.get('email_address', '') if contact_info else '',
+                    'contact_name': contact_info.get('name', '') if contact_info else '',
+                    'address': full_address.strip()
                 })
             
             cursor = data.get('cursor')
@@ -459,6 +487,8 @@ def sync_vendors_to_airtable():
             'Name': name,
             'Phone': vendor['phone'],
             'Email': vendor['email'],
+            'Contact Name': vendor['contact_name'],
+            'Address': vendor['address'],
             'Last Synced': datetime.now().strftime('%m/%d/%Y %I:%M %p')
         }
         
