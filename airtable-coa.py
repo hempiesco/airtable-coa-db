@@ -202,6 +202,15 @@ def fetch_square_items():
                         variation_id = variation.get('id')
                         variation_name = variation_data.get('name', '')
                         
+                        # Get vendor ID from item_variation_vendor_infos
+                        vendor_id = None
+                        for vendor_info in variation.get('item_variation_vendor_infos', []):
+                            if not vendor_info.get('is_deleted', False):
+                                vendor_data = vendor_info.get('item_variation_vendor_info_data', {})
+                                vendor_id = vendor_data.get('vendor_id')
+                                if vendor_id:
+                                    break
+                        
                         # Check inventory for this variation
                         inventory_counts = get_inventory_counts(variation_id)
                         if not has_stock(inventory_counts):
@@ -222,7 +231,7 @@ def fetch_square_items():
                             'category_name': category_name,
                             'quantity': 1,  # We know it has stock but not the exact quantity
                             'sku': variation_data.get('sku', ''),
-                            'vendor': item_data.get('vendor_id', '')
+                            'vendor': vendor_id
                         })
                 else:
                     # Simple product without variations
@@ -240,7 +249,7 @@ def fetch_square_items():
                         'category_name': category_name,
                         'quantity': 1,  # We know it has stock but not the exact quantity
                         'sku': item_data.get('sku', ''),
-                        'vendor': item_data.get('vendor_id', '')
+                        'vendor': None  # Simple items don't have vendor info in this structure
                     })
             
             cursor = data.get('cursor')
