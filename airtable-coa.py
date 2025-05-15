@@ -296,6 +296,7 @@ def sync_square_to_airtable():
         product_id = item['id']
         name = item['name']
         category_name = item['category_name']
+        vendor_id = item['vendor']  # Get the vendor ID
         
         # Skip if category is in excluded list (but allow empty categories)
         if category_name and is_excluded_category(None, category_name, None):
@@ -315,7 +316,7 @@ def sync_square_to_airtable():
             'Present At All Locations': True,
             'Last Updated': datetime.now().strftime('%m/%d/%Y %I:%M %p'),
             'SKU': item['sku'],
-            'Vendor Name': item['vendor']
+            'Vendor': [vendor_id] if vendor_id else []  # Add vendor ID as a lookup field
         }
         
         # Add category if it exists
