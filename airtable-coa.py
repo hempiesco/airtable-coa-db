@@ -365,9 +365,9 @@ def fetch_square_vendors():
     cursor = None
     
     while True:
-        endpoint = f"{SQUARE_BASE_URL}/vendors"
+        endpoint = f"{SQUARE_BASE_URL}/catalog/list?types=VENDOR"
         if cursor:
-            endpoint += f"?cursor={cursor}"
+            endpoint += f"&cursor={cursor}"
             
         headers = {
             'Square-Version': '2023-09-25',
@@ -380,16 +380,18 @@ def fetch_square_vendors():
             response.raise_for_status()
             data = response.json()
             
-            if not data.get('vendors'):
+            if not data.get('objects'):
                 break
                 
-            for vendor in data.get('vendors', []):
-                vendors.append({
-                    'id': vendor.get('id'),
-                    'name': vendor.get('name', ''),
-                    'phone': vendor.get('phone_number', ''),
-                    'email': vendor.get('email', '')
-                })
+            for obj in data.get('objects', []):
+                if obj['type'] == 'VENDOR':
+                    vendor_data = obj.get('vendor_data', {})
+                    vendors.append({
+                        'id': obj.get('id'),
+                        'name': vendor_data.get('name', ''),
+                        'phone': vendor_data.get('phone_number', ''),
+                        'email': vendor_data.get('email', '')
+                    })
             
             cursor = data.get('cursor')
             if not cursor:
