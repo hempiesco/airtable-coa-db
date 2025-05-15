@@ -72,14 +72,38 @@ def trigger_sync():
             .status { margin: 20px 0; }
         </style>
         <script>
-            function autoRefresh() {
-                if (document.getElementById('sync-status').textContent.includes('running')) {
-                    setTimeout(function() {
-                        window.location.reload();
-                    }, 2000);  // Refresh every 2 seconds if sync is running
+            let refreshInterval;
+            
+            function startAutoRefresh() {
+                refreshInterval = setInterval(function() {
+                    fetch('/sync')
+                        .then(response => response.text())
+                        .then(html => {
+                            const parser = new DOMParser();
+                            const doc = parser.parseFromString(html, 'text/html');
+                            const statusText = doc.getElementById('sync-status').textContent;
+                            
+                            if (statusText.includes('running')) {
+                                window.location.reload();
+                            } else {
+                                clearInterval(refreshInterval);
+                            }
+                        });
+                }, 2000);
+            }
+            
+            function stopAutoRefresh() {
+                if (refreshInterval) {
+                    clearInterval(refreshInterval);
                 }
             }
-            window.onload = autoRefresh;
+            
+            window.onload = function() {
+                const statusText = document.getElementById('sync-status').textContent;
+                if (statusText.includes('running')) {
+                    startAutoRefresh();
+                }
+            };
         </script>
     </head>
     <body>
@@ -93,7 +117,7 @@ def trigger_sync():
                 {% endif %}
             </p>
             {% if is_syncing %}
-                <form action="/cancel" method="post">
+                <form action="/cancel" method="post" onsubmit="stopAutoRefresh()">
                     <button type="submit" class="button cancel-button">Cancel Sync</button>
                 </form>
             {% else %}
