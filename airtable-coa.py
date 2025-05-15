@@ -8,6 +8,7 @@ import logging
 
 # Configuration from environment variables
 SQUARE_ACCESS_TOKEN = os.environ.get('SQUARE_ACCESS_TOKEN')
+SQUARE_APPLICATION_ID = os.environ.get('SQUARE_APPLICATION_ID')  # Add this to your environment variables
 SQUARE_LOCATION_IDS = os.environ.get('SQUARE_LOCATION_IDS', 'LXNA062VNG2T2').split(',')  # Comma-separated list of location IDs
 AIRTABLE_API_KEY = os.environ.get('AIRTABLE_API_KEY')
 AIRTABLE_BASE_ID = os.environ.get('AIRTABLE_BASE_ID')
@@ -42,6 +43,15 @@ stats = {
     'total': 0
 }
 
+def get_square_headers():
+    """Get headers for Square API requests"""
+    return {
+        'Square-Version': '2025-04-16',
+        'Authorization': f'Bearer {SQUARE_ACCESS_TOKEN}',
+        'Content-Type': 'application/json',
+        'Square-Application-ID': SQUARE_APPLICATION_ID
+    }
+
 def fetch_square_categories():
     """Fetch all categories from Square API"""
     logger.info("Fetching categories from Square API...")
@@ -54,14 +64,8 @@ def fetch_square_categories():
         if cursor:
             endpoint += f"&cursor={cursor}"
             
-        headers = {
-            'Square-Version': '2023-09-25',
-            'Authorization': f'Bearer {SQUARE_ACCESS_TOKEN}',
-            'Content-Type': 'application/json'
-        }
-        
         try:
-            response = requests.get(endpoint, headers=headers)
+            response = requests.get(endpoint, headers=get_square_headers())
             response.raise_for_status()
             data = response.json()
             
@@ -108,31 +112,25 @@ def get_inventory_counts(catalog_item_id):
     """Get inventory counts for an item across all locations"""
     endpoint = f"{SQUARE_BASE_URL}/inventory/batch-retrieve-counts"
     
-    headers = {
-        'Square-Version': '2023-09-25',
-        'Authorization': f'Bearer {SQUARE_ACCESS_TOKEN}',
-        'Content-Type': 'application/json'
-    }
-    
     body = {
         'catalog_object_ids': [catalog_item_id],
         'location_ids': SQUARE_LOCATION_IDS
     }
     
     try:
-        response = requests.post(endpoint, headers=headers, json=body)
+        response = requests.post(endpoint, headers=get_square_headers(), json=body)
         response.raise_for_status()
         data = response.json()
         
         return data.get('counts', [])
     except Exception as e:
-        logger.error(f"Error fetching inventory: {str(e)}")
+        logger.warning(f"Error fetching inventory: {str(e)}")
         return []
 
 def has_stock(inventory_counts):
     """Check if item has stock in any location"""
     if not inventory_counts:
-        return False
+        return True  # Assume in stock if we can't check inventory
     
     total_quantity = 0
     for count in inventory_counts:
@@ -144,7 +142,7 @@ def has_stock(inventory_counts):
 def get_total_quantity(inventory_counts):
     """Calculate total quantity across all locations"""
     if not inventory_counts:
-        return 0
+        return 1  # Return 1 if we can't check inventory
     
     total = 0
     for count in inventory_counts:
@@ -166,14 +164,8 @@ def fetch_square_items():
         if cursor:
             endpoint += f"&cursor={cursor}"
             
-        headers = {
-            'Square-Version': '2023-09-25',
-            'Authorization': f'Bearer {SQUARE_ACCESS_TOKEN}',
-            'Content-Type': 'application/json'
-        }
-        
         try:
-            response = requests.get(endpoint, headers=headers)
+            response = requests.get(endpoint, headers=get_square_headers())
             response.raise_for_status()
             data = response.json()
             
@@ -224,7 +216,7 @@ def fetch_square_items():
                             'variation_name': variation_name,
                             'category_id': category_id,
                             'category_name': category_name,
-                            'quantity': 1,  # We know it has stock but not the exact quantity
+                            'quantity': get_total_quantity(inventory_counts),
                             'sku': variation_data.get('sku', ''),
                             'vendor': item_data.get('vendor_id', '')
                         })
@@ -242,7 +234,7 @@ def fetch_square_items():
                         'variation_name': '',
                         'category_id': category_id,
                         'category_name': category_name,
-                        'quantity': 1,  # We know it has stock but not the exact quantity
+                        'quantity': get_total_quantity(inventory_counts),
                         'sku': item_data.get('sku', ''),
                         'vendor': item_data.get('vendor_id', '')
                     })
