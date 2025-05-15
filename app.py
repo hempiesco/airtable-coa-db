@@ -71,17 +71,32 @@ def trigger_sync():
             }
             .status { margin: 20px 0; }
         </style>
+        <script>
+            function autoRefresh() {
+                if (document.getElementById('sync-status').textContent.includes('running')) {
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 2000);  // Refresh every 2 seconds if sync is running
+                }
+            }
+            window.onload = autoRefresh;
+        </script>
     </head>
     <body>
         <h1>Sync Status</h1>
         <div class="status">
+            <p id="sync-status">
+                {% if is_syncing %}
+                    Sync is currently running...
+                {% else %}
+                    No sync is currently running.
+                {% endif %}
+            </p>
             {% if is_syncing %}
-                <p>Sync is currently running...</p>
                 <form action="/cancel" method="post">
                     <button type="submit" class="button cancel-button">Cancel Sync</button>
                 </form>
             {% else %}
-                <p>No sync is currently running.</p>
                 <form action="/sync" method="post">
                     <button type="submit" class="button">Start Sync</button>
                 </form>
