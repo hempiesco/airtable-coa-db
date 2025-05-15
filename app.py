@@ -1,4 +1,4 @@
-from flask import Flask, render_template_string, redirect, url_for, jsonify
+from flask import Flask, render_template_string, redirect, url_for
 import threading
 import subprocess
 import sys
@@ -69,53 +69,11 @@ def trigger_sync():
             .cancel-button { 
                 background-color: #f44336; 
             }
+            .refresh-button {
+                background-color: #2196F3;
+            }
             .status { margin: 20px 0; }
         </style>
-        <script>
-            let refreshInterval;
-            
-            function startAutoRefresh() {
-                refreshInterval = setInterval(function() {
-                    fetch('/sync')
-                        .then(response => response.text())
-                        .then(html => {
-                            const parser = new DOMParser();
-                            const doc = parser.parseFromString(html, 'text/html');
-                            const statusText = doc.getElementById('sync-status').textContent;
-                            
-                            if (statusText.includes('running')) {
-                                window.location.reload();
-                            } else {
-                                clearInterval(refreshInterval);
-                            }
-                        });
-                }, 2000);
-            }
-            
-            function stopAutoRefresh() {
-                if (refreshInterval) {
-                    clearInterval(refreshInterval);
-                }
-            }
-            
-            function handleCancel(event) {
-                event.preventDefault();
-                stopAutoRefresh();
-                
-                fetch('/cancel', {
-                    method: 'POST',
-                }).then(() => {
-                    window.location.href = '/sync';
-                });
-            }
-            
-            window.onload = function() {
-                const statusText = document.getElementById('sync-status').textContent;
-                if (statusText.includes('running')) {
-                    startAutoRefresh();
-                }
-            };
-        </script>
     </head>
     <body>
         <h1>Sync Status</h1>
@@ -128,7 +86,7 @@ def trigger_sync():
                 {% endif %}
             </p>
             {% if is_syncing %}
-                <form onsubmit="handleCancel(event)">
+                <form action="/cancel" method="post">
                     <button type="submit" class="button cancel-button">Cancel Sync</button>
                 </form>
             {% else %}
@@ -136,6 +94,9 @@ def trigger_sync():
                     <button type="submit" class="button">Start Sync</button>
                 </form>
             {% endif %}
+            <form action="/sync" method="get" style="margin-top: 10px;">
+                <button type="submit" class="button refresh-button">Refresh Status</button>
+            </form>
         </div>
     </body>
     </html>
@@ -161,7 +122,7 @@ def cancel_sync():
             current_sync_process = None
         except Exception as e:
             print(f"Error canceling sync: {e}")
-    return jsonify({"status": "success"})
+    return redirect(url_for('trigger_sync'))
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000) 
