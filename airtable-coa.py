@@ -314,9 +314,9 @@ def sync_square_to_airtable():
             'Vendor Name': item['vendor']
         }
         
-        # Add category if it exists and is not empty
+        # Add category if it exists
         if category_name and category_name.strip():
-            record_data['Category'] = category_name
+            record_data['Category'] = category_name.strip()
         
         # Check if product already exists
         if product_id in existing_products:
