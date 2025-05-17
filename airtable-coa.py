@@ -350,7 +350,7 @@ def sync_square_to_airtable():
         
         # Add vendor ID if it exists
         if vendor_id:
-            record_data['Vendor'] = [vendor_id]  # Wrap in list for Airtable link field
+            record_data['Vendor'] = vendor_id  # Just put the vendor ID directly
         
         # Add category if it exists
         if category_name and category_name.strip():
