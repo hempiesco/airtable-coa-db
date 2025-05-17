@@ -204,12 +204,13 @@ def fetch_square_items():
                         
                         # Get vendor ID from item_variation_vendor_infos
                         vendor_id = None
-                        for vendor_info in variation.get('item_variation_vendor_infos', []):
-                            if not vendor_info.get('is_deleted', False):
-                                vendor_data = vendor_info.get('item_variation_vendor_info_data', {})
-                                vendor_id = vendor_data.get('vendor_id')
-                                if vendor_id:
-                                    break
+                        if 'item_variation_vendor_infos' in variation_data:
+                            for vendor_info in variation_data['item_variation_vendor_infos']:
+                                if not vendor_info.get('is_deleted', False):
+                                    vendor_data = vendor_info.get('item_variation_vendor_info_data', {})
+                                    vendor_id = vendor_data.get('vendor_id')
+                                    if vendor_id:
+                                        break
                         
                         # Check inventory for this variation
                         inventory_counts = get_inventory_counts(variation_id)
