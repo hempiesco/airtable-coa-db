@@ -285,6 +285,18 @@ def get_existing_airtable_products():
         logger.error(f"Error fetching Airtable products: {str(e)}")
         return {}
 
+def get_vendor_record_id(vendor_id):
+    """Get the Airtable record ID for a Square vendor ID"""
+    try:
+        table = Api(AIRTABLE_API_KEY).table(AIRTABLE_BASE_ID, AIRTABLE_VENDOR_TABLE)
+        records = table.all(formula=f"{{VendorID}}='{vendor_id}'")
+        if records:
+            return records[0]['id']
+        return None
+    except Exception as e:
+        logger.error(f"Error getting vendor record ID: {str(e)}")
+        return None
+
 def sync_square_to_airtable():
     """Main function to sync Square products to Airtable"""
     logger.info("Starting Square to Airtable sync...")
@@ -326,7 +338,7 @@ def sync_square_to_airtable():
             'Present At All Locations': True,
             'Last Updated': datetime.now().strftime('%m/%d/%Y %I:%M %p'),
             'SKU': item['sku'],
-            'Vendor': [vendor_id] if vendor_id else []  # Ensure Vendor is always an array
+            'Vendor': vendor_id if vendor_id else ''  # Just store the vendor ID as a string
         }
         
         # Add category if it exists
