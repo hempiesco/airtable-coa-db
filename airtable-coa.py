@@ -204,7 +204,7 @@ def fetch_square_items():
                         
                         # Get vendor ID from item_variation_vendor_infos
                         vendor_id = None
-                        for vendor_info in variation.get('item_variation_vendor_infos', []):
+                        for vendor_info in variation_data.get('item_variation_vendor_infos', []):
                             if not vendor_info.get('is_deleted', False):
                                 vendor_data = vendor_info.get('item_variation_vendor_info_data', {})
                                 vendor_id = vendor_data.get('vendor_id')
@@ -231,7 +231,7 @@ def fetch_square_items():
                             'category_name': category_name,
                             'quantity': 1,  # We know it has stock but not the exact quantity
                             'sku': variation_data.get('sku', ''),
-                            'vendor': vendor_id
+                            'vendor_id': vendor_id  # Store the Square vendor ID
                         })
                 else:
                     # Simple product without variations
@@ -249,7 +249,7 @@ def fetch_square_items():
                         'category_name': category_name,
                         'quantity': 1,  # We know it has stock but not the exact quantity
                         'sku': item_data.get('sku', ''),
-                        'vendor': None  # Simple items don't have vendor info in this structure
+                        'vendor_id': None  # Simple items don't have vendor info in this structure
                     })
             
             cursor = data.get('cursor')
@@ -284,6 +284,30 @@ def get_existing_airtable_products():
         logger.error(f"Error fetching Airtable products: {str(e)}")
         return {}
 
+def get_existing_airtable_vendors():
+    """Get all existing vendors from Airtable"""
+    logger.info("Fetching existing vendors from Airtable...")
+    
+    existing_vendors = {}
+    
+    try:
+        table = Api(AIRTABLE_API_KEY).table(AIRTABLE_BASE_ID, AIRTABLE_VENDOR_TABLE)
+        records = table.all()
+        
+        for record in records:
+            vendor_id = record['fields'].get('VendorID')
+            if vendor_id:
+                existing_vendors[vendor_id] = {
+                    'record': record,
+                    'airtable_id': record['id']
+                }
+                
+        logger.info(f"Found {len(existing_vendors)} existing vendors in Airtable")
+        return existing_vendors
+    except Exception as e:
+        logger.error(f"Error fetching Airtable vendors: {str(e)}")
+        return {}
+
 def sync_square_to_airtable():
     """Main function to sync Square products to Airtable"""
     logger.info("Starting Square to Airtable sync...")
@@ -295,6 +319,9 @@ def sync_square_to_airtable():
     # Get existing products from Airtable
     existing_products = get_existing_airtable_products()
     
+    # Get existing vendors from Airtable
+    existing_vendors = get_existing_airtable_vendors()
+    
     # Track product IDs to keep
     products_to_keep = set()
     
@@ -305,7 +332,7 @@ def sync_square_to_airtable():
         product_id = item['id']
         name = item['name']
         category_name = item['category_name']
-        vendor_id = item['vendor']  # Get the vendor ID
+        vendor_id = item['vendor_id']  # Get the Square vendor ID
         
         # Skip if category is in excluded list (but allow empty categories)
         if category_name and is_excluded_category(None, category_name, None):
@@ -324,9 +351,12 @@ def sync_square_to_airtable():
             'Item Data Ecom Available': True,
             'Present At All Locations': True,
             'Last Updated': datetime.now().strftime('%m/%d/%Y %I:%M %p'),
-            'SKU': item['sku'],
-            'Vendor': [vendor_id] if vendor_id else []  # Add vendor ID as a lookup field
+            'SKU': item['sku']
         }
+        
+        # Add vendor link if vendor exists in Airtable
+        if vendor_id and vendor_id in existing_vendors:
+            record_data['Vendor'] = [existing_vendors[vendor_id]['airtable_id']]
         
         # Add category if it exists
         if category_name and category_name.strip():
@@ -448,27 +478,6 @@ def fetch_square_vendors():
     
     logger.info(f"Fetched {len(vendors)} vendors from Square")
     return vendors
-
-def get_existing_airtable_vendors():
-    """Get all existing vendors from Airtable"""
-    logger.info("Fetching existing vendors from Airtable...")
-    
-    existing_vendors = {}
-    
-    try:
-        table = Api(AIRTABLE_API_KEY).table(AIRTABLE_BASE_ID, AIRTABLE_VENDOR_TABLE)
-        records = table.all()
-        
-        for record in records:
-            vendor_id = record['fields'].get('VendorID')
-            if vendor_id:
-                existing_vendors[vendor_id] = record
-                
-        logger.info(f"Found {len(existing_vendors)} existing vendors in Airtable")
-        return existing_vendors
-    except Exception as e:
-        logger.error(f"Error fetching Airtable vendors: {str(e)}")
-        return {}
 
 def sync_vendors_to_airtable():
     """Sync Square vendors to Airtable"""
