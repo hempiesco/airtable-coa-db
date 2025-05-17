@@ -297,10 +297,7 @@ def get_existing_airtable_vendors():
         for record in records:
             vendor_id = record['fields'].get('VendorID')
             if vendor_id:
-                existing_vendors[vendor_id] = {
-                    'record': record,
-                    'airtable_id': record['id']
-                }
+                existing_vendors[vendor_id] = record
                 
         logger.info(f"Found {len(existing_vendors)} existing vendors in Airtable")
         return existing_vendors
@@ -353,7 +350,7 @@ def sync_square_to_airtable():
         
         # Add vendor ID if it exists
         if vendor_id:
-            record_data['Vendor'] = vendor_id
+            record_data['Vendor'] = [vendor_id]  # Wrap in list for Airtable link field
         
         # Add category if it exists
         if category_name and category_name.strip():
@@ -517,6 +514,13 @@ def sync_vendors_to_airtable():
                 logger.info(f"Updated vendor: {name}")
             except Exception as e:
                 logger.error(f"Error updating vendor {name}: {str(e)}")
+                # Try to create a new record if update fails
+                try:
+                    table = Api(AIRTABLE_API_KEY).table(AIRTABLE_BASE_ID, AIRTABLE_VENDOR_TABLE)
+                    table.create(record_data)
+                    logger.info(f"Created new vendor record for: {name}")
+                except Exception as create_error:
+                    logger.error(f"Error creating new vendor record for {name}: {str(create_error)}")
         else:
             # Create new record
             try:
