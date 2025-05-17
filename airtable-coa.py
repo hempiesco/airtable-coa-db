@@ -319,9 +319,6 @@ def sync_square_to_airtable():
     # Get existing products from Airtable
     existing_products = get_existing_airtable_products()
     
-    # Get existing vendors from Airtable
-    existing_vendors = get_existing_airtable_vendors()
-    
     # Track product IDs to keep
     products_to_keep = set()
     
@@ -354,9 +351,9 @@ def sync_square_to_airtable():
             'SKU': item['sku']
         }
         
-        # Add vendor link if vendor exists in Airtable
-        if vendor_id and vendor_id in existing_vendors:
-            record_data['Vendor'] = [existing_vendors[vendor_id]['airtable_id']]
+        # Add vendor ID if it exists
+        if vendor_id:
+            record_data['Vendor'] = vendor_id
         
         # Add category if it exists
         if category_name and category_name.strip():
