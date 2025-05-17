@@ -338,7 +338,7 @@ def sync_square_to_airtable():
             'Present At All Locations': True,
             'Last Updated': datetime.now().strftime('%m/%d/%Y %I:%M %p'),
             'SKU': item['sku'],
-            'Vendor': [str(vendor_id)] if vendor_id else []  # Send vendor ID in an array format
+            'Vendor': str(vendor_id) if vendor_id else ''  # Send vendor ID as a simple string
         }
         
         # Add category if it exists
