@@ -180,12 +180,18 @@ def fetch_square_items():
                 if item['type'] != 'ITEM':
                     continue
                     
-                # Skip archived/deleted items
+                # Skip deleted items
                 if item.get('is_deleted', False):
                     continue
                     
                 # Get item data
                 item_data = item.get('item_data', {})
+                
+                # Skip archived items
+                if item_data.get('is_archived', False):
+                    logger.info(f"Skipping archived item: {item_data.get('name', '')}")
+                    continue
+                
                 item_name = item_data.get('name', '')
                 category_id = item_data.get('category_id', '')
                 category_name = category_map.get(category_id, '')
@@ -214,8 +220,21 @@ def fetch_square_items():
                         
                         # Check inventory for this variation
                         inventory_counts = get_inventory_counts(variation_id)
-                        if not has_stock(inventory_counts):
-                            logger.info(f"Skipping variation {item_name} - {variation_name} - out of stock")
+                        
+                        # Check if item is out of stock at all locations
+                        all_locations_out_of_stock = True
+                        for count in inventory_counts:
+                            try:
+                                quantity = float(count.get('quantity', 0))
+                                if quantity > 0:
+                                    all_locations_out_of_stock = False
+                                    break
+                            except (ValueError, TypeError):
+                                logger.warning(f"Invalid quantity value: {count.get('quantity')}")
+                                continue
+                        
+                        if all_locations_out_of_stock:
+                            logger.info(f"Skipping variation {item_name} - {variation_name} - out of stock at all locations")
                             continue
                             
                         # Variation has stock, add to list
@@ -237,8 +256,21 @@ def fetch_square_items():
                 else:
                     # Simple product without variations
                     inventory_counts = get_inventory_counts(item.get('id'))
-                    if not has_stock(inventory_counts):
-                        logger.info(f"Skipping item {item_name} - out of stock")
+                    
+                    # Check if item is out of stock at all locations
+                    all_locations_out_of_stock = True
+                    for count in inventory_counts:
+                        try:
+                            quantity = float(count.get('quantity', 0))
+                            if quantity > 0:
+                                all_locations_out_of_stock = False
+                                break
+                        except (ValueError, TypeError):
+                            logger.warning(f"Invalid quantity value: {count.get('quantity')}")
+                            continue
+                    
+                    if all_locations_out_of_stock:
+                        logger.info(f"Skipping item {item_name} - out of stock at all locations")
                         continue
                         
                     items.append({
