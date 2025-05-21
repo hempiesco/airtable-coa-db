@@ -89,23 +89,32 @@ def is_excluded_category(category_id, category_name, category_map):
     if not category_name:
         return False
         
+    # Log the category being checked
+    logger.info(f"Checking category: '{category_name}' against excluded list: {EXCLUDED_CATEGORIES}")
+    
     # Check by ID
     if category_id in EXCLUDED_CATEGORIES:
         logger.info(f"Category excluded by ID: {category_id}")
         return True
         
-    # Check by name
+    # Check by name (exact match)
     if category_name in EXCLUDED_CATEGORIES:
-        logger.info(f"Category excluded by name: {category_name}")
+        logger.info(f"Category excluded by exact name match: {category_name}")
         return True
         
     # Check case insensitive
     category_name_lower = category_name.lower()
     for excluded in EXCLUDED_CATEGORIES:
-        if excluded.lower() == category_name_lower:
-            logger.info(f"Category excluded by case-insensitive name: {category_name}")
+        excluded_lower = excluded.lower()
+        if excluded_lower == category_name_lower:
+            logger.info(f"Category excluded by case-insensitive name match: {category_name}")
+            return True
+        # Also check if the category name contains any of the excluded terms
+        if excluded_lower in category_name_lower:
+            logger.info(f"Category excluded by partial name match: {category_name} contains {excluded}")
             return True
     
+    logger.info(f"Category not excluded: {category_name}")
     return False
 
 def get_inventory_counts(catalog_item_id):
@@ -157,6 +166,11 @@ def fetch_square_items():
     cursor = None
     category_map = fetch_square_categories()
     
+    # Log all categories for debugging
+    logger.info("Available categories from Square:")
+    for cat_id, cat_name in category_map.items():
+        logger.info(f"Category ID: {cat_id}, Name: {cat_name}")
+    
     while True:
         endpoint = f"{SQUARE_BASE_URL}/catalog/list?types=ITEM"
         if cursor:
@@ -193,8 +207,24 @@ def fetch_square_items():
                     continue
                 
                 item_name = item_data.get('name', '')
-                category_id = item_data.get('category_id', '')
-                category_name = category_map.get(category_id, '')
+                
+                # Get category information
+                category_id = None
+                category_name = None
+                
+                # Check categories array first
+                if 'categories' in item_data:
+                    for cat in item_data['categories']:
+                        cat_id = cat.get('id')
+                        if cat_id in category_map:
+                            category_id = cat_id
+                            category_name = category_map[cat_id]
+                            break
+                
+                # If no category found in categories array, try category_id field
+                if not category_id and 'category_id' in item_data:
+                    category_id = item_data['category_id']
+                    category_name = category_map.get(category_id, '')
                 
                 # Skip excluded categories
                 if is_excluded_category(category_id, category_name, category_map):
