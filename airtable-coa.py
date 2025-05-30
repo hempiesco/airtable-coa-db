@@ -2,9 +2,12 @@ import os
 import time
 import requests
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from pyairtable import Api
 import logging
+import schedule
+import threading
+import time
 
 # Configuration from environment variables
 SQUARE_ACCESS_TOKEN = os.environ.get('SQUARE_ACCESS_TOKEN')
@@ -607,6 +610,33 @@ def sync_vendors_to_airtable():
     
     logger.info("Vendor sync completed")
 
+def run_sync():
+    """Run the complete sync process"""
+    logger.info("Starting automated sync process...")
+    try:
+        sync_vendors_to_airtable()  # Sync vendors first
+        sync_square_to_airtable()   # Then sync products
+        logger.info("Automated sync completed successfully")
+    except Exception as e:
+        logger.error(f"Error during automated sync: {str(e)}")
+
+def run_scheduler():
+    """Run the scheduler in a separate thread"""
+    while True:
+        schedule.run_pending()
+        time.sleep(60)  # Check every minute
+
+def setup_scheduler():
+    """Set up the weekly schedule"""
+    # Schedule the sync to run every Monday at 1:00 AM
+    schedule.every().monday.at("01:00").do(run_sync)
+    
+    # Start the scheduler in a separate thread
+    scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
+    scheduler_thread.start()
+    
+    logger.info("Scheduler started - sync will run every Monday at 1:00 AM")
+
 if __name__ == "__main__":
     if not SQUARE_ACCESS_TOKEN:
         logger.error("Square API token is not configured")
@@ -615,7 +645,17 @@ if __name__ == "__main__":
     if not AIRTABLE_API_KEY or not AIRTABLE_BASE_ID:
         logger.error("Airtable credentials are not configured")
         exit(1)
-        
-    # Run the syncs
-    sync_vendors_to_airtable()  # Sync vendors first
-    sync_square_to_airtable()   # Then sync products
+    
+    # Set up the scheduler for automated weekly runs
+    setup_scheduler()
+    
+    # Run an initial sync
+    logger.info("Running initial sync...")
+    run_sync()
+    
+    # Keep the main thread alive
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        logger.info("Shutting down...")
