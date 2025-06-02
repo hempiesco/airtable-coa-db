@@ -8,6 +8,9 @@ import logging
 import schedule
 import threading
 import time
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # Configuration from environment variables
 SQUARE_ACCESS_TOKEN = os.environ.get('SQUARE_ACCESS_TOKEN')
@@ -17,6 +20,10 @@ AIRTABLE_BASE_ID = os.environ.get('AIRTABLE_BASE_ID')
 AIRTABLE_TABLE_NAME = os.environ.get('AIRTABLE_TABLE_NAME', 'Products')
 AIRTABLE_VENDOR_TABLE = os.environ.get('AIRTABLE_VENDOR_TABLE', 'Vendors')
 NOTIFICATION_EMAIL = os.environ.get('NOTIFICATION_EMAIL')
+SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
+SMTP_USERNAME = os.environ.get('SMTP_USERNAME')
+SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD')
 
 # Categories to exclude
 EXCLUDED_CATEGORIES = os.environ.get('EXCLUDED_CATEGORIES', 'Pet Products,Accessories,Crystals,Apparel,Party').split(',')
@@ -44,6 +51,30 @@ stats = {
     'removed': 0,
     'total': 0
 }
+
+def send_notification(subject, message):
+    """Send email notification"""
+    if not all([NOTIFICATION_EMAIL, SMTP_USERNAME, SMTP_PASSWORD]):
+        logger.warning("Email notification settings not configured")
+        return
+
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = SMTP_USERNAME
+        msg['To'] = NOTIFICATION_EMAIL
+        msg['Subject'] = subject
+
+        msg.attach(MIMEText(message, 'plain'))
+
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server.starttls()
+        server.login(SMTP_USERNAME, SMTP_PASSWORD)
+        server.send_message(msg)
+        server.quit()
+        
+        logger.info(f"Notification sent: {subject}")
+    except Exception as e:
+        logger.error(f"Failed to send notification: {str(e)}")
 
 def fetch_square_categories():
     """Fetch all categories from Square API"""
@@ -612,12 +643,45 @@ def sync_vendors_to_airtable():
 
 def run_sync():
     """Run the complete sync process"""
+    start_time = datetime.now()
     logger.info("Starting automated sync process...")
+    send_notification(
+        "COA Sync Started",
+        f"Automated sync process started at {start_time.strftime('%Y-%m-%d %H:%M:%S')}"
+    )
+    
     try:
         sync_vendors_to_airtable()  # Sync vendors first
         sync_square_to_airtable()   # Then sync products
+        
+        end_time = datetime.now()
+        duration = end_time - start_time
+        
+        # Prepare stats message
+        stats_message = f"""
+Sync completed successfully!
+
+Duration: {duration}
+Stats:
+- Total items processed: {stats['total']}
+- Created: {stats['created']}
+- Updated: {stats['updated']}
+- Skipped: {stats['skipped']}
+- Removed: {stats['removed']}
+
+Started at: {start_time.strftime('%Y-%m-%d %H:%M:%S')}
+Completed at: {end_time.strftime('%Y-%m-%d %H:%M:%S')}
+"""
+        send_notification("COA Sync Completed", stats_message)
         logger.info("Automated sync completed successfully")
     except Exception as e:
+        error_message = f"""
+Error during automated sync:
+
+Error: {str(e)}
+Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+"""
+        send_notification("COA Sync Error", error_message)
         logger.error(f"Error during automated sync: {str(e)}")
 
 def run_scheduler():
@@ -635,6 +699,14 @@ def setup_scheduler():
     scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
     scheduler_thread.start()
     
+    next_run = schedule.next_run()
+    message = f"""
+Scheduler started successfully!
+
+Next scheduled run: {next_run.strftime('%Y-%m-%d %H:%M:%S')}
+Sync will run every Monday at 1:00 AM
+"""
+    send_notification("COA Sync Scheduler Started", message)
     logger.info("Scheduler started - sync will run every Monday at 1:00 AM")
 
 if __name__ == "__main__":
