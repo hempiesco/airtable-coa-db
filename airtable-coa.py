@@ -153,7 +153,7 @@ def is_excluded_category(category_id, category_name, category_map):
 
 def get_inventory_counts(catalog_item_id):
     """Get inventory counts for an item across all locations"""
-    endpoint = f"{SQUARE_BASE_URL}/inventory/batch-retrieve-counts"
+    endpoint = f"{SQUARE_BASE_URL}/inventory/counts/batch-retrieve"
     
     headers = {
         'Square-Version': '2023-09-25',
