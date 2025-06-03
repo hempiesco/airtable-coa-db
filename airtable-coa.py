@@ -164,7 +164,7 @@ def get_inventory_counts(catalog_item_id):
     body = {
         'catalog_object_ids': [catalog_item_id],
         'location_ids': [SQUARE_LOCATION_ID],
-        'states': ['IN_STOCK', 'SOLD_OUT']
+        'states': ['IN_STOCK', 'OUT_OF_STOCK']
     }
     
     try:
