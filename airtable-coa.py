@@ -161,9 +161,12 @@ def get_inventory_counts(catalog_item_id):
         'Content-Type': 'application/json'
     }
     
+    # Split location IDs if they're comma-separated
+    location_ids = [loc.strip() for loc in SQUARE_LOCATION_ID.split(',')]
+    
     body = {
         'catalog_object_ids': [catalog_item_id],
-        'location_ids': [SQUARE_LOCATION_ID]
+        'location_ids': location_ids
     }
     
     try:
@@ -171,12 +174,23 @@ def get_inventory_counts(catalog_item_id):
         if response.status_code == 404:
             # Try the alternative endpoint
             alt_endpoint = f"{SQUARE_BASE_URL}/inventory/counts"
-            location_ids_str = ','.join([SQUARE_LOCATION_ID])
-            params = {
-                'catalog_object_id': catalog_item_id,
-                'location_ids': location_ids_str
-            }
-            response = requests.get(alt_endpoint, headers=headers, params=params)
+            # For the GET endpoint, we need to make separate requests for each location
+            all_counts = []
+            for loc_id in location_ids:
+                params = {
+                    'catalog_object_id': catalog_item_id,
+                    'location_ids': loc_id
+                }
+                try:
+                    loc_response = requests.get(alt_endpoint, headers=headers, params=params)
+                    loc_response.raise_for_status()
+                    loc_data = loc_response.json()
+                    if 'counts' in loc_data:
+                        all_counts.extend(loc_data['counts'])
+                except requests.exceptions.RequestException as e:
+                    logger.error(f"Error fetching inventory for location {loc_id}: {str(e)}")
+                    continue
+            return all_counts
             
         response.raise_for_status()
         data = response.json()
