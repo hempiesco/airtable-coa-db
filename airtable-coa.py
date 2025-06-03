@@ -163,17 +163,31 @@ def get_inventory_counts(catalog_item_id):
     
     body = {
         'catalog_object_ids': [catalog_item_id],
-        'location_ids': [SQUARE_LOCATION_ID]
+        'location_ids': [SQUARE_LOCATION_ID],
+        'states': ['IN_STOCK', 'SOLD_OUT']
     }
     
     try:
         response = requests.post(endpoint, headers=headers, json=body)
+        if response.status_code == 404:
+            logger.warning(f"Inventory endpoint not found for item {catalog_item_id}. This might be a new item or the endpoint might have changed.")
+            return []
+            
         response.raise_for_status()
         data = response.json()
         
+        if 'counts' not in data:
+            logger.warning(f"No counts found in response for item {catalog_item_id}")
+            return []
+            
         return data.get('counts', [])
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error fetching inventory for item {catalog_item_id}: {str(e)}")
+        if hasattr(e.response, 'text'):
+            logger.error(f"Response text: {e.response.text}")
+        return []
     except Exception as e:
-        logger.error(f"Error fetching inventory: {str(e)}")
+        logger.error(f"Unexpected error fetching inventory for item {catalog_item_id}: {str(e)}")
         return []
 
 def has_stock(inventory_counts):
