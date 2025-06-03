@@ -153,7 +153,7 @@ def is_excluded_category(category_id, category_name, category_map):
 
 def get_inventory_counts(catalog_item_id):
     """Get inventory counts for an item across all locations"""
-    endpoint = f"{SQUARE_BASE_URL}/inventory/counts"
+    endpoint = f"{SQUARE_BASE_URL}/inventory/counts/batch-retrieve"
     
     headers = {
         'Square-Version': '2023-09-25',
@@ -161,16 +161,22 @@ def get_inventory_counts(catalog_item_id):
         'Content-Type': 'application/json'
     }
     
-    params = {
-        'catalog_object_id': catalog_item_id,
+    body = {
+        'catalog_object_ids': [catalog_item_id],
         'location_ids': [SQUARE_LOCATION_ID]
     }
     
     try:
-        response = requests.get(endpoint, headers=headers, params=params)
+        response = requests.post(endpoint, headers=headers, json=body)
         if response.status_code == 404:
-            logger.warning(f"Inventory endpoint not found for item {catalog_item_id}. This might be a new item or the endpoint might have changed.")
-            return []
+            # Try the alternative endpoint
+            alt_endpoint = f"{SQUARE_BASE_URL}/inventory/counts"
+            location_ids_str = ','.join([SQUARE_LOCATION_ID])
+            params = {
+                'catalog_object_id': catalog_item_id,
+                'location_ids': location_ids_str
+            }
+            response = requests.get(alt_endpoint, headers=headers, params=params)
             
         response.raise_for_status()
         data = response.json()
