@@ -720,9 +720,9 @@ def setup_scheduler():
     schedule.clear()
     logger.info("Cleared any existing scheduled jobs")
     
-    # Schedule the sync to run every Tuesday at 10:45 PM
-    schedule.every().tuesday.at("22:45").do(run_sync)
-    logger.info("Scheduled sync for every Tuesday at 10:45 PM EST")
+    # Schedule the sync to run every Tuesday at 10:55 PM
+    schedule.every().tuesday.at("22:55").do(run_sync)
+    logger.info("Scheduled sync for every Tuesday at 10:55 PM EST")
     
     # Start the scheduler in a separate thread
     scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
@@ -737,10 +737,10 @@ Scheduler started successfully!
 Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 Next scheduled run: {next_run.strftime('%Y-%m-%d %H:%M:%S')}
 Time until next run: {next_run - datetime.now()}
-Sync will run every Tuesday at 10:45 PM EST
+Sync will run every Tuesday at 10:55 PM EST
 """
         send_notification("COA Sync Scheduler Started", message)
-        logger.info("Scheduler started - sync will run every Tuesday at 10:45 PM EST")
+        logger.info("Scheduler started - sync will run every Tuesday at 10:55 PM EST")
         logger.info(f"Next scheduled run: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
     else:
         error_msg = "Failed to schedule next run - no next run time available"
