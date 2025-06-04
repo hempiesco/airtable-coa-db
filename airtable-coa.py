@@ -719,14 +719,24 @@ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
 def run_scheduler():
     """Run the scheduler in a separate thread"""
+    logger.info("Scheduler thread started - checking for pending tasks every minute")
     while True:
-        schedule.run_pending()
-        time.sleep(60)  # Check every minute
+        try:
+            schedule.run_pending()
+            # Log the next scheduled run every 5 minutes
+            if datetime.now().minute % 5 == 0:
+                next_run = schedule.next_run()
+                if next_run:
+                    logger.info(f"Next scheduled run: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
+            time.sleep(60)  # Check every minute
+        except Exception as e:
+            logger.error(f"Error in scheduler thread: {str(e)}")
+            time.sleep(60)  # Wait a minute before retrying
 
 def setup_scheduler():
     """Set up the weekly schedule"""
-    # Schedule the sync to run every Tuesday at 10:25 PM
-    schedule.every().tuesday.at("22:25").do(run_sync)
+    # Schedule the sync to run every Tuesday at 10:45 PM
+    schedule.every().tuesday.at("22:45").do(run_sync)
     
     # Start the scheduler in a separate thread
     scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
@@ -737,10 +747,11 @@ def setup_scheduler():
 Scheduler started successfully!
 
 Next scheduled run: {next_run.strftime('%Y-%m-%d %H:%M:%S')}
-Sync will run every Tuesday at 10:25 PM
+Sync will run every Tuesday at 10:45 PM EST
 """
     send_notification("COA Sync Scheduler Started", message)
-    logger.info("Scheduler started - sync will run every Tuesday at 10:25 PM")
+    logger.info("Scheduler started - sync will run every Tuesday at 10:45 PM EST")
+    logger.info(f"Next scheduled run: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
 
 if __name__ == "__main__":
     if not SQUARE_ACCESS_TOKEN:
