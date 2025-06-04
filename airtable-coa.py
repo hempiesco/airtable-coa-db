@@ -674,17 +674,90 @@ def sync_vendors_to_airtable():
     
     logger.info("Vendor sync completed")
 
+def run_scheduler():
+    """Run the scheduler in a separate thread"""
+    logger.info("=== SCHEDULER THREAD STARTED ===")
+    logger.info("Scheduler will check for pending tasks every minute")
+    logger.info(f"Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    
+    while True:
+        try:
+            current_time = datetime.now()
+            logger.info(f"Checking for pending tasks at {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            # Get all jobs
+            jobs = schedule.get_jobs()
+            logger.info(f"Number of scheduled jobs: {len(jobs)}")
+            
+            for job in jobs:
+                logger.info(f"Next run for job: {job.next_run.strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            schedule.run_pending()
+            
+            # Log the next scheduled run every minute
+            next_run = schedule.next_run()
+            if next_run:
+                logger.info(f"Next scheduled run: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
+                time_until_next = next_run - current_time
+                logger.info(f"Time until next run: {time_until_next}")
+            else:
+                logger.warning("No next run scheduled!")
+            
+            time.sleep(60)  # Check every minute
+        except Exception as e:
+            logger.error(f"Error in scheduler thread: {str(e)}")
+            logger.error(f"Error details: {type(e).__name__}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            time.sleep(60)  # Wait a minute before retrying
+
+def setup_scheduler():
+    """Set up the weekly schedule"""
+    logger.info("=== SETTING UP SCHEDULER ===")
+    logger.info(f"Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    
+    # Clear any existing jobs
+    schedule.clear()
+    logger.info("Cleared any existing scheduled jobs")
+    
+    # Schedule the sync to run every Tuesday at 10:45 PM
+    schedule.every().tuesday.at("22:45").do(run_sync)
+    logger.info("Scheduled sync for every Tuesday at 10:45 PM EST")
+    
+    # Start the scheduler in a separate thread
+    scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
+    scheduler_thread.start()
+    logger.info("Started scheduler thread")
+    
+    next_run = schedule.next_run()
+    if next_run:
+        message = f"""
+Scheduler started successfully!
+
+Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+Next scheduled run: {next_run.strftime('%Y-%m-%d %H:%M:%S')}
+Time until next run: {next_run - datetime.now()}
+Sync will run every Tuesday at 10:45 PM EST
+"""
+        send_notification("COA Sync Scheduler Started", message)
+        logger.info("Scheduler started - sync will run every Tuesday at 10:45 PM EST")
+        logger.info(f"Next scheduled run: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
+    else:
+        error_msg = "Failed to schedule next run - no next run time available"
+        logger.error(error_msg)
+        send_notification("COA Sync Scheduler Error", error_msg)
+
 def run_sync():
     """Run the complete sync process"""
     start_time = datetime.now()
-    logger.info("Starting automated sync process...")
-    send_notification(
-        "COA Sync Started",
-        f"Automated sync process started at {start_time.strftime('%Y-%m-%d %H:%M:%S')}"
-    )
+    logger.info("=== STARTING AUTOMATED SYNC PROCESS ===")
+    logger.info(f"Sync started at: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
     
     try:
+        logger.info("Starting vendor sync...")
         sync_vendors_to_airtable()  # Sync vendors first
+        
+        logger.info("Starting product sync...")
         sync_square_to_airtable()   # Then sync products
         
         end_time = datetime.now()
@@ -706,7 +779,9 @@ Started at: {start_time.strftime('%Y-%m-%d %H:%M:%S')}
 Completed at: {end_time.strftime('%Y-%m-%d %H:%M:%S')}
 """
         send_notification("COA Sync Completed", stats_message)
-        logger.info("Automated sync completed successfully")
+        logger.info("=== AUTOMATED SYNC COMPLETED SUCCESSFULLY ===")
+        logger.info(f"Sync completed at: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.info(f"Total duration: {duration}")
     except Exception as e:
         error_message = f"""
 Error during automated sync:
@@ -714,44 +789,12 @@ Error during automated sync:
 Error: {str(e)}
 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 """
-        send_notification("COA Sync Error", error_message)
+        logger.error("=== SYNC FAILED ===")
         logger.error(f"Error during automated sync: {str(e)}")
-
-def run_scheduler():
-    """Run the scheduler in a separate thread"""
-    logger.info("Scheduler thread started - checking for pending tasks every minute")
-    while True:
-        try:
-            schedule.run_pending()
-            # Log the next scheduled run every 5 minutes
-            if datetime.now().minute % 5 == 0:
-                next_run = schedule.next_run()
-                if next_run:
-                    logger.info(f"Next scheduled run: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
-            time.sleep(60)  # Check every minute
-        except Exception as e:
-            logger.error(f"Error in scheduler thread: {str(e)}")
-            time.sleep(60)  # Wait a minute before retrying
-
-def setup_scheduler():
-    """Set up the weekly schedule"""
-    # Schedule the sync to run every Tuesday at 10:45 PM
-    schedule.every().tuesday.at("22:45").do(run_sync)
-    
-    # Start the scheduler in a separate thread
-    scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
-    scheduler_thread.start()
-    
-    next_run = schedule.next_run()
-    message = f"""
-Scheduler started successfully!
-
-Next scheduled run: {next_run.strftime('%Y-%m-%d %H:%M:%S')}
-Sync will run every Tuesday at 10:45 PM EST
-"""
-    send_notification("COA Sync Scheduler Started", message)
-    logger.info("Scheduler started - sync will run every Tuesday at 10:45 PM EST")
-    logger.info(f"Next scheduled run: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        send_notification("COA Sync Error", error_message)
 
 if __name__ == "__main__":
     if not SQUARE_ACCESS_TOKEN:
