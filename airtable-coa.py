@@ -725,8 +725,8 @@ def run_scheduler():
 
 def setup_scheduler():
     """Set up the weekly schedule"""
-    # Schedule the sync to run every Monday at 1:00 AM
-    schedule.every().monday.at("01:00").do(run_sync)
+    # Schedule the sync to run every Tuesday at 10:25 PM
+    schedule.every().tuesday.at("22:25").do(run_sync)
     
     # Start the scheduler in a separate thread
     scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
@@ -737,10 +737,10 @@ def setup_scheduler():
 Scheduler started successfully!
 
 Next scheduled run: {next_run.strftime('%Y-%m-%d %H:%M:%S')}
-Sync will run every Monday at 1:00 AM
+Sync will run every Tuesday at 10:25 PM
 """
     send_notification("COA Sync Scheduler Started", message)
-    logger.info("Scheduler started - sync will run every Monday at 1:00 AM")
+    logger.info("Scheduler started - sync will run every Tuesday at 10:25 PM")
 
 if __name__ == "__main__":
     if not SQUARE_ACCESS_TOKEN:
